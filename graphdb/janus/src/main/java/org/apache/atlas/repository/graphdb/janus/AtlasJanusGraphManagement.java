@@ -23,10 +23,7 @@ import org.apache.tinkerpop.gremlin.structure.Direction;
 import org.janusgraph.core.Cardinality;
 import org.janusgraph.core.EdgeLabel;
 import org.janusgraph.core.PropertyKey;
-import org.janusgraph.core.schema.Mapping;
-import org.janusgraph.core.schema.PropertyKeyMaker;
-import org.janusgraph.core.schema.JanusGraphIndex;
-import org.janusgraph.core.schema.JanusGraphManagement;
+import org.janusgraph.core.schema.*;
 import org.janusgraph.core.schema.JanusGraphManagement.IndexBuilder;
 import org.janusgraph.graphdb.internal.Token;
 import org.apache.atlas.repository.graphdb.AtlasCardinality;
@@ -48,6 +45,8 @@ import java.util.Set;
  * Janus implementation of AtlasGraphManagement.
  */
 public class AtlasJanusGraphManagement implements AtlasGraphManagement {
+    private static final Parameter[] STRING_PARAMETER_ARRAY = new Parameter[]{Mapping.STRING.asParameter()};
+
     private static final Logger LOG            = LoggerFactory.getLogger(AtlasJanusGraphManagement.class);
     private static final char[] RESERVED_CHARS = { '{', '}', '"', '$', Token.SEPARATOR_CHAR };
 
@@ -148,7 +147,6 @@ public class AtlasJanusGraphManagement implements AtlasGraphManagement {
         }
 
         PropertyKeyMaker propertyKeyBuilder = management.makePropertyKey(propertyName).dataType(propertyClass);
-
         if (cardinality != null) {
             Cardinality janusCardinality = AtlasJanusObjectFactory.createCardinality(cardinality);
             propertyKeyBuilder.cardinality(janusCardinality);
@@ -195,22 +193,43 @@ public class AtlasJanusGraphManagement implements AtlasGraphManagement {
     }
 
     @Override
-    public void addMixedIndex(String indexName, AtlasPropertyKey propertyKey) {
-        PropertyKey     janusKey    = AtlasJanusObjectFactory.createPropertyKey(propertyKey);
-        JanusGraphIndex vertexIndex = management.getGraphIndex(indexName);
+    public String addMixedIndex(String indexName, AtlasPropertyKey propertyKey, boolean isStringField) {
+        PropertyKey     janusKey        = AtlasJanusObjectFactory.createPropertyKey(propertyKey);
+        JanusGraphIndex janusGraphIndex = management.getGraphIndex(indexName);
 
-        management.addIndexKey(vertexIndex, janusKey);
-        String encodedName = graph.getIndexFieldName(propertyKey, vertexIndex.getBackingIndex());
+        if(isStringField) {
+            management.addIndexKey(janusGraphIndex, janusKey, Mapping.STRING.asParameter());
+            LOG.debug("created a string type for {} with janueKey {}.", propertyKey.getName(), janusKey);
+        } else {
+            management.addIndexKey(janusGraphIndex, janusKey);
+            LOG.debug("created a default type for {} with janueKey {}.", propertyKey.getName(), janusKey);
+        }
+
+        String encodedName = "";
+        if(isStringField) {
+            encodedName = graph.getIndexFieldName(propertyKey, janusGraphIndex, STRING_PARAMETER_ARRAY);
+        } else {
+            encodedName = graph.getIndexFieldName(propertyKey, janusGraphIndex);
+        }
+
+
         LOG.info("property '{}' is encoded to '{}'.", propertyKey.getName(), encodedName);
+
+        return encodedName;
     }
 
     @Override
-    public String getIndexFieldName(String indexName, AtlasPropertyKey propertyKey) {
-        JanusGraphIndex index = management.getGraphIndex(indexName);
-        return graph.getIndexFieldName(propertyKey, index.getBackingIndex());
+    public String getIndexFieldName(String indexName, AtlasPropertyKey propertyKey, boolean isStringField) {
+        JanusGraphIndex janusGraphIndex = management.getGraphIndex(indexName);
+
+        if(isStringField) {
+            return graph.getIndexFieldName(propertyKey, janusGraphIndex, STRING_PARAMETER_ARRAY);
+        } else {
+            return graph.getIndexFieldName(propertyKey, janusGraphIndex);
+        }
+
     }
 
-    @Override
     public AtlasGraphIndex getGraphIndex(String indexName) {
         JanusGraphIndex index = management.getGraphIndex(indexName);
 

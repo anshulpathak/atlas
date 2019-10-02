@@ -51,6 +51,7 @@ import org.janusgraph.core.PropertyKey;
 import org.janusgraph.core.SchemaViolationException;
 import org.janusgraph.core.schema.JanusGraphIndex;
 import org.janusgraph.core.schema.JanusGraphManagement;
+import org.janusgraph.core.schema.Mapping;
 import org.janusgraph.core.schema.Parameter;
 import org.janusgraph.diskstorage.BackendException;
 import org.janusgraph.graphdb.database.StandardJanusGraph;
@@ -75,12 +76,14 @@ import static org.apache.atlas.repository.graphdb.janus.AtlasJanusGraphDatabase.
  */
 public class AtlasJanusGraph implements AtlasGraph<AtlasJanusVertex, AtlasJanusEdge> {
     private static final Logger LOG = LoggerFactory.getLogger(AtlasJanusGraph.class);
-    private static Configuration APPLICATION_PROPERTIES = null;
+    private static final Parameter[] EMPTY_PARAMETER_ARRAY  = new Parameter[0];
+
+
+    private static       Configuration APPLICATION_PROPERTIES = null;
 
     private final ConvertGremlinValueFunction GREMLIN_VALUE_CONVERSION_FUNCTION = new ConvertGremlinValueFunction();
     private final Set<String>                 multiProperties                   = new HashSet<>();
     private final StandardJanusGraph          janusGraph;
-    private final Parameter[] EMPTY_PARAMETER_ARRAY = new Parameter[0];
 
     public AtlasJanusGraph() {
         this(getGraphInstance());
@@ -198,7 +201,7 @@ public class AtlasJanusGraph implements AtlasGraph<AtlasJanusVertex, AtlasJanusE
         try {
             initApplicationProperties();
 
-            return new AtlasJanusGraphIndexClient(this, APPLICATION_PROPERTIES);
+            return new AtlasJanusGraphIndexClient(APPLICATION_PROPERTIES);
         } catch (Exception e) {
             LOG.error("Error encountered in creating Graph Index Client.", e);
             throw new AtlasException(e);
@@ -340,7 +343,7 @@ public class AtlasJanusGraph implements AtlasGraph<AtlasJanusVertex, AtlasJanusE
     public void releaseGremlinScriptEngine(ScriptEngine scriptEngine) {
         if (scriptEngine instanceof GremlinGroovyScriptEngine) {
             try {
-                ((GremlinGroovyScriptEngine) scriptEngine).close();
+                ((GremlinGroovyScriptEngine) scriptEngine).reset();
             } catch (Exception e) {
                 // ignore
             }
@@ -414,6 +417,15 @@ public class AtlasJanusGraph implements AtlasGraph<AtlasJanusVertex, AtlasJanusE
 
     public void addMultiProperties(Set<String> names) {
         multiProperties.addAll(names);
+    }
+
+
+    String getIndexFieldName(AtlasPropertyKey propertyKey, JanusGraphIndex graphIndex, Parameter ... parameters) {
+        PropertyKey janusKey = AtlasJanusObjectFactory.createPropertyKey(propertyKey);
+        if(parameters == null) {
+            parameters = EMPTY_PARAMETER_ARRAY;
+        }
+        return janusGraph.getIndexSerializer().getDefaultFieldName(janusKey, parameters, graphIndex.getBackingIndex());
     }
 
 
@@ -523,10 +535,5 @@ public class AtlasJanusGraph implements AtlasGraph<AtlasJanusVertex, AtlasJanusE
         public Object apply(Object input) {
             return convertGremlinValue(input);
         }
-    }
-
-    public String getIndexFieldName(AtlasPropertyKey propertyKey, String indexName) {
-        PropertyKey janusKey = AtlasJanusObjectFactory.createPropertyKey(propertyKey);
-        return  janusGraph.getIndexSerializer().getDefaultFieldName(janusKey, EMPTY_PARAMETER_ARRAY, indexName);
     }
 }

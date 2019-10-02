@@ -131,7 +131,7 @@ public class FullTextMapperV2 {
             entity        = entityWithExtInfo != null ? entityWithExtInfo.getEntity() : null;
             entityExtInfo = entityWithExtInfo;
         } else {
-            entity        = getAndCacheEntity(guid);
+            entity        = getAndCacheEntity(guid, false);
             entityExtInfo = null;
         }
 
@@ -271,12 +271,16 @@ public class FullTextMapperV2 {
         }
     }
 
-    private AtlasEntity getAndCacheEntity(String guid) throws AtlasBaseException {
+    public AtlasEntity getAndCacheEntity(String guid) throws AtlasBaseException {
+        return getAndCacheEntity(guid, true);
+    }
+
+    public AtlasEntity  getAndCacheEntity(String guid, boolean includeReferences) throws AtlasBaseException {
         RequestContext context = RequestContext.get();
         AtlasEntity    entity  = context.getEntity(guid);
 
         if (entity == null) {
-            entity = entityGraphRetriever.toAtlasEntity(guid);
+            entity = entityGraphRetriever.toAtlasEntity(guid, includeReferences);
 
             if (entity != null) {
                 context.cache(entity);
@@ -290,7 +294,7 @@ public class FullTextMapperV2 {
         return entity;
     }
 
-    private AtlasEntityWithExtInfo getAndCacheEntityWithExtInfo(String guid) throws AtlasBaseException {
+    public AtlasEntityWithExtInfo getAndCacheEntityWithExtInfo(String guid) throws AtlasBaseException {
         RequestContext         context           = RequestContext.get();
         AtlasEntityWithExtInfo entityWithExtInfo = context.getEntityWithExtInfo(guid);
 

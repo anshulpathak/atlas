@@ -228,6 +228,9 @@ define(['require',
                     skipDefaultError: true,
                     queryParam: queryParam,
                     success: function(data) {
+                        if (that.isDestroyed) {
+                            return;
+                        }
                         if (data.relations.length) {
                             that.lineageData = $.extend(true, {}, data);
                             that.relationshipMap = that.crateLineageRelationshipHashMap(data);
@@ -568,13 +571,7 @@ define(['require',
                         .attr("href", function(d) {
                             var that = this;
                             if (node) {
-                                // to check for IE-10
-                                var originLink = window.location.origin;
-                                if (platform.name === "IE") {
-                                    originLink = window.location.protocol + "//" + window.location.host;
-                                }
-                                var imageIconPath = Utils.getEntityIconPath({ entityData: node }),
-                                    imagePath = ((originLink + Utils.getBaseUrl(window.location.pathname)) + imageIconPath);
+                                var imageIconPath = Utils.getEntityIconPath({ entityData: node });
 
                                 var getImageData = function(options) {
                                     var imagePath = options.imagePath,
@@ -587,12 +584,12 @@ define(['require',
                                     if (platform.name !== "IE") {
                                         ajaxOptions["mimeType"] = "text/plain; charset=x-user-defined";
                                     }
+                                    shapeSvg.attr("data-iconpath", imagePath);
                                     $.ajax(ajaxOptions)
                                         .always(function(data, status, xhr) {
                                             if (data.status == 404) {
                                                 getImageData({
-                                                    "imagePath": Utils.getEntityIconPath({ entityData: node, errorUrl: imagePath }),
-                                                    "imageIconPath": imageIconPath
+                                                    "imagePath": Utils.getEntityIconPath({ entityData: node, errorUrl: imagePath })
                                                 });
                                             } else if (data) {
                                                 if (platform.name !== "IE") {
@@ -605,8 +602,7 @@ define(['require',
                                 }
                                 if (_.keys(imageObject).indexOf(imageIconPath) === -1) {
                                     getImageData({
-                                        "imagePath": imagePath,
-                                        "imageIconPath": imageIconPath
+                                        "imagePath": imageIconPath
                                     });
                                 }
 
@@ -618,6 +614,9 @@ define(['require',
                                     imageObject[imageIconPath].push(d3.select(that));
                                 } else {
                                     d3.select(that).attr("xlink:href", imageObject[imageIconPath]);
+                                    if (imageIconPath !== shapeSvg.attr("data-iconpath")) {
+                                        shapeSvg.attr("data-iconpathorigin", imageIconPath);
+                                    }
                                     return imageObject[imageIconPath];
                                 }
                             }
@@ -774,11 +773,18 @@ define(['require',
                             clearTimeout(waitForDoubleClick)
                             waitForDoubleClick = null;
                             tooltip.hide(d);
-                            Utils.setUrl({
-                                url: '#!/detailPage/' + d + '?tabActive=lineage',
-                                mergeBrowserUrl: false,
-                                trigger: true
-                            });
+                            if (that.guid == d) {
+                                Utils.notifyInfo({
+                                    html: true,
+                                    content: "You are already on " + "<b>" + that.entityName + "</b> detail page."
+                                });
+                            } else {
+                                Utils.setUrl({
+                                    url: '#!/detailPage/' + d + '?tabActive=lineage',
+                                    mergeBrowserUrl: false,
+                                    trigger: true
+                                });
+                            }
                         } else {
                             var currentEvent = d3.event
                             waitForDoubleClick = setTimeout(function() {
@@ -787,7 +793,7 @@ define(['require',
                                 $(el).find('circle').addClass('node-detail-highlight');
                                 that.updateRelationshipDetails({ guid: d });
                                 waitForDoubleClick = null;
-                            }, 150)
+                            }, 170)
                         }
                     });
 
@@ -857,7 +863,7 @@ define(['require',
                         typeStr += '<option value="' + obj.guid + '">' + obj.attributes.name + '</option>';
                     });
                 }
-                that.ui.lineageTypeSearch.html(typeStr);
+                this.ui.lineageTypeSearch.html(typeStr);
                 this.initilizelineageTypeSearch();
             },
             initilizelineageTypeSearch: function() {
@@ -1011,7 +1017,7 @@ define(['require',
                         try {
                             var a = document.createElement("a"),
                                 entityAttributes = that.entity && that.entity.attributes;
-                            a.download = ((entityAttributes && entityAttributes.qualifiedName) || "lineage_export") + ".png";
+                            a.download = ((entityAttributes && (entityAttributes.qualifiedName || entityAttributes.name) || "lineage_export") + ".png");
                             document.body.appendChild(a);
                             ctx.drawImage(img, 50, 50, canvas.width, canvas.height);
                             canvas.toBlob(function(blob) {

@@ -55,6 +55,11 @@ for i in "${BASEDIR}/hook/hbase/atlas-hbase-plugin-impl/"*.jar; do
   ATLASCPPATH="${ATLASCPPATH}:$i"
 done
 
+if [ -z "${ATLAS_CONF_DIR}" ] && [ -e /etc/atlas/conf ];then
+    ATLAS_CONF_DIR=/etc/atlas/conf
+fi
+ATLASCPPATH=${ATLASCPPATH}:${ATLAS_CONF_DIR}
+
 # log dir for applications
 ATLAS_LOG_DIR="${ATLAS_LOG_DIR:-$BASEDIR/logs}"
 export ATLAS_LOG_DIR
@@ -109,7 +114,7 @@ else
     exit 1
 fi
 
-CP="${ATLASCPPATH}:${HBASE_CP}:${HADOOP_CP}"
+CP="${HBASE_CP}:${HADOOP_CP}:${ATLASCPPATH}"
 
 # If running in cygwin, convert pathnames and classpath to Windows format.
 if [ "${CYGWIN}" == "true" ]

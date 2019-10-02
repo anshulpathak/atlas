@@ -317,7 +317,7 @@
                                         <artifactItem>
                                             <groupId>com.fasterxml.jackson.core</groupId>
                                             <artifactId>jackson-databind</artifactId>
-                                            <version>${jackson.version}</version>
+                                            <version>${jackson.databind.version}</version>
                                         </artifactItem>
 
                                         <artifactItem>
@@ -449,6 +449,10 @@
                         <systemProperty>
                             <key>embedded.solr.directory</key>
                             <value>${project.build.directory}</value>
+                        </systemProperty>
+                        <systemProperty>
+                            <name>org.eclipse.jetty.annotations.maxWait</name>
+                            <value>5000</value>
                         </systemProperty>
                     </systemProperties>
                     <stopKey>atlas-stop</stopKey>

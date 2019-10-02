@@ -39,12 +39,16 @@ public final class Constants {
     public static final String GUID_PROPERTY_KEY                = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "guid");
     public static final String RELATIONSHIP_GUID_PROPERTY_KEY   = encodePropertyKey(RELATIONSHIP_PROPERTY_KEY_PREFIX + GUID_PROPERTY_KEY);
     public static final String HISTORICAL_GUID_PROPERTY_KEY     = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "historicalGuids");
-    public static final String FREETEXT_REQUEST_HANDLER = "/freetext";
+    public static final String FREETEXT_REQUEST_HANDLER         = "/freetext";
+    public static final String TERMS_REQUEST_HANDLER            = "/terms";
+
     /**
      * Entity type name property key.
      */
     public static final String ENTITY_TYPE_PROPERTY_KEY = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "typeName");
     public static final String TYPE_NAME_INTERNAL       = INTERNAL_PROPERTY_KEY_PREFIX + "internal";
+    public static final String ASSET_ENTITY_TYPE = "Asset";
+    public static final String OWNER_ATTRIBUTE   = "owner";
 
     /**
      * Entity type's super types property key.
@@ -78,15 +82,17 @@ public final class Constants {
     /**
      * Trait names property key and index name.
      */
-    public static final String TRAIT_NAMES_PROPERTY_KEY            = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "traitNames");
-    public static final String PROPAGATED_TRAIT_NAMES_PROPERTY_KEY = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "propagatedTraitNames");
+    public static final String TRAIT_NAMES_PROPERTY_KEY             = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "traitNames");
+    public static final String PROPAGATED_TRAIT_NAMES_PROPERTY_KEY  = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "propagatedTraitNames");
 
-    public static final String VERSION_PROPERTY_KEY          = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "version");
-    public static final String STATE_PROPERTY_KEY            = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "state");
-    public static final String CREATED_BY_KEY                = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "createdBy");
-    public static final String CLASSIFICATION_TEXT_KEY       = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "classificationsText");
+    public static final String VERSION_PROPERTY_KEY                 = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "version");
+    public static final String STATE_PROPERTY_KEY                   = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "state");
+    public static final String CREATED_BY_KEY                       = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "createdBy");
+    public static final String CLASSIFICATION_TEXT_KEY              = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "classificationsText");
+    public static final String CLASSIFICATION_NAMES_KEY             = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "classificationNames");
+    public static final String PROPAGATED_CLASSIFICATION_NAMES_KEY  = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "propagatedClassificationNames");
 
-    public static final String MODIFIED_BY_KEY      = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "modifiedBy");
+    public static final String MODIFIED_BY_KEY                      = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "modifiedBy");
 
     /**
      * Patch vertices property keys.
@@ -128,6 +134,8 @@ public final class Constants {
     public static final String TIMESTAMP_PROPERTY_KEY = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "timestamp");
 
     public static final String MODIFICATION_TIMESTAMP_PROPERTY_KEY = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "modificationTimestamp");
+
+    public static final String IS_INCOMPLETE_PROPERTY_KEY = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "isIncomplete");
 
     /**
      * search backing index name.
@@ -174,6 +182,7 @@ public final class Constants {
     public static final String CLASSIFICATION_EDGE_IS_PROPAGATED_PROPERTY_KEY = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "isPropagated");
     public static final String CLASSIFICATION_EDGE_STATE_PROPERTY_KEY         = STATE_PROPERTY_KEY;
     public static final String CLASSIFICATION_LABEL                           = "classifiedAs";
+    public static final String CLASSIFICATION_NAME_DELIMITER                  = "|";
     public static final String TERM_ASSIGNMENT_LABEL                          = "r:AtlasGlossarySemanticAssignment";
     public static final String ATTRIBUTE_INDEX_PROPERTY_KEY                   = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "index");
     public static final String ATTRIBUTE_KEY_PROPERTY_KEY                     = encodePropertyKey(INTERNAL_PROPERTY_KEY_PREFIX + "key");
@@ -185,9 +194,10 @@ public final class Constants {
      * replication attributes
      */
 
-    public static final String ATTR_NAME_REFERENCEABLE = "Referenceable.";
-    public static final String ATTR_NAME_REPLICATED_TO = "replicatedTo";
-    public static final String ATTR_NAME_REPLICATED_FROM = "replicatedFrom";
+    public static final String  ATTR_NAME_REFERENCEABLE   = "Referenceable.";
+    public static final String  ATTR_NAME_REPLICATED_TO   = "replicatedTo";
+    public static final String  ATTR_NAME_REPLICATED_FROM = "replicatedFrom";
+    public static final Integer INCOMPLETE_ENTITY_VALUE   = Integer.valueOf(1);
 
     private Constants() {
     }

@@ -105,10 +105,10 @@ public class HiveHookIT extends HiveITBase {
         Assert.assertEquals(params.get("p1"), "v1");
 
         //There should be just one entity per dbname
-        runCommand("drop database " + dbName);
+        runCommandWithDelay("drop database " + dbName, 3000);
         assertDatabaseIsNotRegistered(dbName);
 
-        runCommand("create database " + dbName);
+        runCommandWithDelay("create database " + dbName, 3000);
         dbId = assertDatabaseIsRegistered(dbName);
 
         //assert on qualified name
@@ -361,7 +361,7 @@ public class HiveHookIT extends HiveITBase {
         String tableName = tableName();
         String command   = "create table " + tableName + "(id int, name string) row format delimited lines terminated by '\n' null defined as ''";
 
-        runCommand(command);
+        runCommandWithDelay(command, 3000);
 
         assertTableIsRegistered(DEFAULT_DB, tableName);
     }
@@ -689,7 +689,7 @@ public class HiveHookIT extends HiveITBase {
         );
 
         //Rerun same query. Should result in same process
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         AtlasEntity processEntity2 = validateProcess(event, expectedInputs, outputs);
         Assert.assertEquals(numberOfProcessExecutions(processEntity2), 2);
@@ -752,7 +752,7 @@ public class HiveHookIT extends HiveITBase {
         );
 
         //Rerun same query. Should result in same process
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         AtlasEntity processEntity2 = validateProcess(event, expectedInputs, outputs);
         AtlasEntity processExecutionEntity2 = validateProcessExecution(processEntity2, event);
@@ -826,7 +826,7 @@ public class HiveHookIT extends HiveITBase {
         validateInputTables(processEntity, inputs);
 
         //Rerun same query with same HDFS path
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         assertTableIsRegistered(DEFAULT_DB, tableName);
 
@@ -846,7 +846,7 @@ public class HiveHookIT extends HiveITBase {
 
         query = "insert overwrite DIRECTORY '" + pFile2  + "' select id, name from " + tableName;
 
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         String tblId          = assertTableIsRegistered(DEFAULT_DB, tableName);
 
@@ -1216,7 +1216,7 @@ public class HiveHookIT extends HiveITBase {
         //Import should update same process
         query = "import table " + importTableName + " from '" + filename + "'";
 
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         Set<ReadEntity> importInputs          = getInputs(filename, Entity.Type.DFS_DIR);
         Set<ReadEntity> expectedImport2Inputs = new LinkedHashSet<ReadEntity>() {{
@@ -1300,7 +1300,7 @@ public class HiveHookIT extends HiveITBase {
         String newTableName        = tableName();
         String query               = String.format("alter table %s rename to %s", DEFAULT_DB + "." + tableName, newDBName + "." + newTableName);
 
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         String newColGuid = assertColumnIsRegistered(HiveMetaStoreBridge.getColumnQualifiedName(HiveMetaStoreBridge.getTableQualifiedName(CLUSTER_NAME, newDBName, newTableName), NAME));
 
@@ -1429,7 +1429,7 @@ public class HiveHookIT extends HiveITBase {
         String tableName  = createTable();
         String query      = String.format("alter table %s change %s %s string", tableName, oldColName, newColName);
 
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         assertColumnIsNotRegistered(HiveMetaStoreBridge.getColumnQualifiedName(HiveMetaStoreBridge.getTableQualifiedName(CLUSTER_NAME, DEFAULT_DB, tableName), oldColName));
         assertColumnIsRegistered(HiveMetaStoreBridge.getColumnQualifiedName(HiveMetaStoreBridge.getTableQualifiedName(CLUSTER_NAME, DEFAULT_DB, tableName), newColName));
@@ -1454,7 +1454,7 @@ public class HiveHookIT extends HiveITBase {
 
         query = String.format("alter table %s change column %s %s %s", tableName, oldColName, newColName, newColType);
 
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         columns = getColumns(DEFAULT_DB, tableName);
 
@@ -1485,7 +1485,7 @@ public class HiveHookIT extends HiveITBase {
 
         query = String.format("alter table %s change column %s %s %s COMMENT '%s' after id", tableName, oldColName, newColName, newColType, comment);
 
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         columns = getColumns(DEFAULT_DB, tableName);
 
@@ -1507,7 +1507,7 @@ public class HiveHookIT extends HiveITBase {
         newColName = "name4";
         query      = String.format("alter table %s change column %s %s %s first", tableName, oldColName, newColName, newColType);
 
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         columns = getColumns(DEFAULT_DB, tableName);
 
@@ -1542,7 +1542,7 @@ public class HiveHookIT extends HiveITBase {
         newColName = "name5";
         query      = String.format("alter table %s change column %s %s %s after id", tableName, oldColName, newColName, newColType);
 
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         columns = getColumns(DEFAULT_DB, tableName);
 
@@ -1674,30 +1674,17 @@ public class HiveHookIT extends HiveITBase {
     }
 
     @Test
-    public void testTruncateTable() throws Exception {
+    public void testIgnoreTruncateTable() throws Exception {
         String tableName = createTable(false);
-        String  query    = String.format("truncate table %s", tableName);
+        String query     = String.format("truncate table %s", tableName);
 
         runCommand(query);
 
         Set<WriteEntity> outputs = getOutputs(tableName, Entity.Type.TABLE);
-        String           tableId = assertTableIsRegistered(DEFAULT_DB, tableName);
         HiveEventContext event   = constructEvent(query, HiveOperation.TRUNCATETABLE, null, outputs);
 
-        AtlasEntity processEntity = validateProcess(event);
-        AtlasEntity processExecutionEntity1 = validateProcessExecution(processEntity, event);
-        AtlasObjectId process = toAtlasObjectId(processExecutionEntity1.getRelationshipAttribute(
-                BaseHiveEvent.ATTRIBUTE_PROCESS));
-        Assert.assertEquals(process.getGuid(), processEntity.getGuid());
-
-        //Check lineage
-        String                         datasetName           = HiveMetaStoreBridge.getTableQualifiedName(CLUSTER_NAME, DEFAULT_DB, tableName);
-        AtlasLineageInfo               atlasLineageInfoInput = atlasClientV2.getLineageInfo(tableId, AtlasLineageInfo.LineageDirection.INPUT,0);
-        Map<String, AtlasEntityHeader> entityMap             = atlasLineageInfoInput.getGuidEntityMap();
-
-        Assert.assertEquals(numberOfProcessExecutions(processEntity), 1);
-        //Below should be assertTrue - Fix https://issues.apache.org/jira/browse/ATLAS-653
-        Assert.assertFalse(entityMap.containsKey(tableId));
+        assertTableIsRegistered(DEFAULT_DB, tableName);
+        assertProcessIsNotRegistered(event);
     }
 
     @Test
@@ -1778,11 +1765,11 @@ public class HiveHookIT extends HiveITBase {
         String newName   = tableName();
         String query     = "create view " + viewName + " as select * from " + tableName;
 
-        runCommand(query);
+        runCommandWithDelay(query, 5000);
 
         query = "alter view " + viewName + " rename to " + newName;
 
-        runCommand(query);
+        runCommandWithDelay(query, 5000);
 
         assertTableIsNotRegistered(DEFAULT_DB, viewName);
 
@@ -1801,7 +1788,7 @@ public class HiveHookIT extends HiveITBase {
         String testPath  = createTestDFSPath("testBaseDir");
         String query     = "alter table " + tableName + " set location '" + testPath + "'";
 
-        runCommandWithDelay(query, 5000);
+        runCommandWithDelay(query, 8000);
 
         String tblId = assertTableIsRegistered(DEFAULT_DB, tableName, new AssertPredicate() {
             @Override
@@ -1944,7 +1931,7 @@ public class HiveHookIT extends HiveITBase {
 
         String query = String.format("drop table %s ", tableName);
 
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         assertColumnIsNotRegistered(HiveMetaStoreBridge.getColumnQualifiedName(HiveMetaStoreBridge.getTableQualifiedName(CLUSTER_NAME, DEFAULT_DB, tableName), "id"));
         assertColumnIsNotRegistered(HiveMetaStoreBridge.getColumnQualifiedName(HiveMetaStoreBridge.getTableQualifiedName(CLUSTER_NAME, DEFAULT_DB, tableName), NAME));
@@ -2018,7 +2005,7 @@ public class HiveHookIT extends HiveITBase {
 
         String dbQualifiedName = HiveMetaStoreBridge.getDBQualifiedName(CLUSTER_NAME, dbName);
 
-        Thread.sleep(5000);
+        Thread.sleep(10000);
 
         try {
             atlasClientV2.getEntityByAttribute(HiveDataTypes.HIVE_DB.getName(), Collections.singletonMap(ATTRIBUTE_QUALIFIED_NAME, dbQualifiedName));
@@ -2068,7 +2055,7 @@ public class HiveHookIT extends HiveITBase {
         String viewName  = tableName();
         String query     = "create view " + viewName + " as select * from " + tableName;
 
-        runCommand(query);
+        runCommandWithDelay(query, 3000);
 
         assertTableIsRegistered(DEFAULT_DB, viewName);
         assertColumnIsRegistered(HiveMetaStoreBridge.getColumnQualifiedName(HiveMetaStoreBridge.getTableQualifiedName(CLUSTER_NAME, DEFAULT_DB, viewName), "id"));
@@ -2076,7 +2063,7 @@ public class HiveHookIT extends HiveITBase {
 
         query = String.format("drop view %s ", viewName);
 
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
         assertColumnIsNotRegistered(HiveMetaStoreBridge.getColumnQualifiedName(HiveMetaStoreBridge.getTableQualifiedName(CLUSTER_NAME, DEFAULT_DB, viewName), "id"));
         assertColumnIsNotRegistered(HiveMetaStoreBridge.getColumnQualifiedName(HiveMetaStoreBridge.getTableQualifiedName(CLUSTER_NAME, DEFAULT_DB, viewName), NAME));
         assertTableIsNotRegistered(DEFAULT_DB, viewName);
@@ -2118,7 +2105,7 @@ public class HiveHookIT extends HiveITBase {
         String fmtQuery = "alter database %s set OWNER %s %s";
         String query    = String.format(fmtQuery, dbName, "USER", owner);
 
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         assertDatabaseIsRegistered(dbName, new AssertPredicate() {
             @Override
@@ -2154,7 +2141,7 @@ public class HiveHookIT extends HiveITBase {
 
         String query = String.format(fmtQuery, entityName, SET_OP, getSerializedProps(expectedProps));
 
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         verifyEntityProperties(entityType, entityName, expectedProps, false);
 
@@ -2163,7 +2150,7 @@ public class HiveHookIT extends HiveITBase {
 
         query = String.format(fmtQuery, entityName, SET_OP, getSerializedProps(expectedProps));
 
-        runCommandWithDelay(query, 1000);
+        runCommandWithDelay(query, 3000);
 
         verifyEntityProperties(entityType, entityName, expectedProps, false);
 
@@ -2174,7 +2161,7 @@ public class HiveHookIT extends HiveITBase {
 
             query = String.format(fmtQuery, entityName, UNSET_OP, Joiner.on("','").skipNulls().appendTo(sb, expectedProps.keySet()).append('\''));
 
-            runCommandWithDelay(query, 1000);
+            runCommandWithDelay(query, 3000);
 
             verifyEntityProperties(entityType, entityName, expectedProps, true);
         }
@@ -2463,7 +2450,7 @@ public class HiveHookIT extends HiveITBase {
             location = " location '" +  createTestDFSPath("someTestPath") + "'";
         }
 
-        runCommand("create " + (isExternal ? " EXTERNAL " : "") + (isTemporary ? "TEMPORARY " : "") + "table " + tableName + "(id int, name string) comment 'table comment' " + (isPartitioned ? " partitioned by(dt string)" : "") + location);
+        runCommandWithDelay("create " + (isExternal ? " EXTERNAL " : "") + (isTemporary ? "TEMPORARY " : "") + "table " + tableName + "(id int, name string) comment 'table comment' " + (isPartitioned ? " partitioned by(dt string)" : "") + location, 3000);
 
         return tableName;
     }

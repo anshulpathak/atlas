@@ -36,10 +36,7 @@ import org.apache.hadoop.hive.ql.metadata.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 public class AlterTableRename extends BaseHiveEvent {
     private static final Logger LOG = LoggerFactory.getLogger(AlterTableRename.class);
@@ -123,29 +120,28 @@ public class AlterTableRename extends BaseHiveEvent {
             return;
         }
 
-        // first update with oldTable info, so that the table will be created if it is not present in Atlas
-        ret.add(new EntityUpdateRequestV2(getUserName(), new AtlasEntitiesWithExtInfo(oldTableEntity)));
-
         // update qualifiedName for all columns, partitionKeys, storageDesc
         String renamedTableQualifiedName = (String) renamedTableEntity.getEntity().getAttribute(ATTRIBUTE_QUALIFIED_NAME);
 
-        renameColumns((List<AtlasObjectId>) oldTableEntity.getEntity().getAttribute(ATTRIBUTE_COLUMNS), oldTableEntity, renamedTableQualifiedName, ret);
-        renameColumns((List<AtlasObjectId>) oldTableEntity.getEntity().getAttribute(ATTRIBUTE_PARTITION_KEYS), oldTableEntity, renamedTableQualifiedName, ret);
+        renameColumns((List<AtlasObjectId>) oldTableEntity.getEntity().getRelationshipAttribute(ATTRIBUTE_COLUMNS), oldTableEntity, renamedTableQualifiedName, ret);
+        renameColumns((List<AtlasObjectId>) oldTableEntity.getEntity().getRelationshipAttribute(ATTRIBUTE_PARTITION_KEYS), oldTableEntity, renamedTableQualifiedName, ret);
         renameStorageDesc(oldTableEntity, renamedTableEntity, ret);
-
-        // remove columns, partitionKeys and storageDesc - as they have already been updated above
-        removeAttribute(renamedTableEntity, ATTRIBUTE_COLUMNS);
-        removeAttribute(renamedTableEntity, ATTRIBUTE_PARTITION_KEYS);
-        removeAttribute(renamedTableEntity, ATTRIBUTE_STORAGEDESC);
 
         // set previous name as the alias
         renamedTableEntity.getEntity().setAttribute(ATTRIBUTE_ALIASES, Collections.singletonList(oldTable.getTableName()));
+
+        // make a copy of renamedTableEntity to send as partial-update with no relationship attributes
+        AtlasEntity renamedTableEntityForPartialUpdate = new AtlasEntity(renamedTableEntity.getEntity());
+        renamedTableEntityForPartialUpdate.setRelationshipAttributes(null);
 
         String        oldTableQualifiedName = (String) oldTableEntity.getEntity().getAttribute(ATTRIBUTE_QUALIFIED_NAME);
         AtlasObjectId oldTableId            = new AtlasObjectId(oldTableEntity.getEntity().getTypeName(), ATTRIBUTE_QUALIFIED_NAME, oldTableQualifiedName);
 
         // update qualifiedName and other attributes (like params - which include lastModifiedTime, lastModifiedBy) of the table
-        ret.add(new EntityPartialUpdateRequestV2(getUserName(), oldTableId, renamedTableEntity));
+        ret.add(new EntityPartialUpdateRequestV2(getUserName(), oldTableId, new AtlasEntityWithExtInfo(renamedTableEntityForPartialUpdate)));
+
+        // to handle cases where Atlas didn't have the oldTable, send a full update
+        ret.add(new EntityUpdateRequestV2(getUserName(), new AtlasEntitiesWithExtInfo(renamedTableEntity)));
 
         // partial update relationship attribute ddl
         if (!context.isMetastoreHook()) {
@@ -173,33 +169,16 @@ public class AlterTableRename extends BaseHiveEvent {
 
     private void renameStorageDesc(AtlasEntityWithExtInfo oldEntityExtInfo, AtlasEntityWithExtInfo newEntityExtInfo, List<HookNotification> notifications) {
         AtlasEntity oldSd = getStorageDescEntity(oldEntityExtInfo);
-        AtlasEntity newSd = getStorageDescEntity(newEntityExtInfo);
+        AtlasEntity newSd = new AtlasEntity(getStorageDescEntity(newEntityExtInfo)); // make a copy of newSd, since we will be setting relationshipAttributes to 'null' below
+                                                                                     // and we need relationship attributes later during entity full update
 
         if (oldSd != null && newSd != null) {
             AtlasObjectId oldSdId = new AtlasObjectId(oldSd.getTypeName(), ATTRIBUTE_QUALIFIED_NAME, oldSd.getAttribute(ATTRIBUTE_QUALIFIED_NAME));
 
             newSd.removeAttribute(ATTRIBUTE_TABLE);
+            newSd.setRelationshipAttributes(null);
 
             notifications.add(new EntityPartialUpdateRequestV2(getUserName(), oldSdId, new AtlasEntityWithExtInfo(newSd)));
-        }
-    }
-
-    private void removeAttribute(AtlasEntityWithExtInfo entity, String attributeName) {
-        Object attributeValue = entity.getEntity().getAttribute(attributeName);
-
-        entity.getEntity().getAttributes().remove(attributeName);
-
-        if (attributeValue instanceof AtlasObjectId) {
-            AtlasObjectId objectId = (AtlasObjectId) attributeValue;
-
-            entity.removeReferredEntity(objectId.getGuid());
-        } else if (attributeValue instanceof Collection) {
-            for (Object item : (Collection) attributeValue)
-                if (item instanceof AtlasObjectId) {
-                    AtlasObjectId objectId = (AtlasObjectId) item;
-
-                    entity.removeReferredEntity(objectId.getGuid());
-                }
         }
     }
 
@@ -207,7 +186,7 @@ public class AlterTableRename extends BaseHiveEvent {
         AtlasEntity ret = null;
 
         if (tableEntity != null && tableEntity.getEntity() != null) {
-            Object attrSdId = tableEntity.getEntity().getAttribute(ATTRIBUTE_STORAGEDESC);
+            Object attrSdId = tableEntity.getEntity().getRelationshipAttribute(ATTRIBUTE_STORAGEDESC);
 
             if (attrSdId instanceof AtlasObjectId) {
                 ret = tableEntity.getReferredEntity(((AtlasObjectId) attrSdId).getGuid());

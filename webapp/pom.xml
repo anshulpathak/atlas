@@ -54,7 +54,7 @@
                 <activeByDefault>false</activeByDefault>
             </activation>
             <properties>
-                <packages.to.exclude>WEB-INF/lib/je-*.jar</packages.to.exclude>
+                <packages.to.exclude>WEB-INF/lib/je-*.jar,WEB-INF/lib/dom4j-*.jar</packages.to.exclude>
             </properties>
         </profile>
 
@@ -383,6 +383,11 @@
             <type>war</type>
         </dependency>
         <dependency>
+            <groupId>org.apache.atlas</groupId>
+            <artifactId>atlas-dashboardv3</artifactId>
+            <type>war</type>
+        </dependency>
+        <dependency>
             <groupId>org.easymock</groupId>
             <artifactId>easymock</artifactId>
             <version>3.4</version>
@@ -468,6 +473,14 @@
             <artifactId>hadoop-aws</artifactId>
             <version>${hadoop.version}</version>
         </dependency>
+
+        <!-- Keycloak -->
+        <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-spring-security-adapter</artifactId>
+            <version>${keycloak.version}</version>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -484,6 +497,10 @@
                             <artifactId>atlas-dashboardv2</artifactId>
                         </overlay>
                         <overlay>
+                            <groupId>org.apache.atlas</groupId>
+                            <artifactId>atlas-dashboardv3</artifactId>
+                        </overlay>
+                        <overlay>
                             <!-- empty groupId/artifactId represents the current build -->
                         </overlay>
                     </overlays>
@@ -493,7 +510,7 @@
                         </manifest>
                     </archive>
                     <packagingExcludes>
-                        WEB-INF/lib/junit*.jar,${packages.to.exclude}
+                        WEB-INF/lib/junit*.jar,WEB-INF/lib/dom4j-*.jar,${packages.to.exclude}
                     </packagingExcludes>
                 </configuration>
             </plugin>
@@ -669,6 +686,14 @@
                         <systemProperty>
                             <key>embedded.solr.directory</key>
                             <value>${project.build.directory}</value>
+                        </systemProperty>
+                        <systemProperty>
+                            <name>org.eclipse.jetty.annotations.maxWait</name>
+                            <value>5000</value>
+                        </systemProperty>
+                        <systemProperty>
+                            <name>org.eclipse.jetty.annotations.maxWait</name>
+                            <value>5000</value>
                         </systemProperty>
                     </systemProperties>
                     <stopKey>atlas-stop</stopKey>

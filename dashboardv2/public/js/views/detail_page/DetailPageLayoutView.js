@@ -354,7 +354,7 @@ define(['require',
                 CommonViewFunction.deleteTag(_.extend({}, {
                     guid: that.id,
                     associatedGuid: that.id != entityGuid ? entityGuid : null,
-                    msg: "<div class='ellipsis'>Remove: " + "<b>" + _.escape(tagName) + "</b> assignment from" + " " + "<b>" + this.name + "?</b></div>",
+                    msg: "<div class='ellipsis-with-margin'>Remove: " + "<b>" + _.escape(tagName) + "</b> assignment from" + " " + "<b>" + this.name + "?</b></div>",
                     titleMessage: Messages.removeTag,
                     okText: "Remove",
                     showLoader: that.showLoader.bind(that),
@@ -378,7 +378,7 @@ define(['require',
                         relationshipGuid: termObj.relationshipGuid
                     },
                     collection: that.glossaryCollection,
-                    msg: "<div class='ellipsis'>Remove: " + "<b>" + _.escape(termName) + "</b> assignment from" + " " + "<b>" + this.name + "?</b></div>",
+                    msg: "<div class='ellipsis-with-margin'>Remove: " + "<b>" + _.escape(termName) + "</b> assignment from" + " " + "<b>" + this.name + "?</b></div>",
                     titleMessage: Messages.glossary.removeTermfromEntity,
                     isEntityView: true,
                     buttonText: "Remove",
@@ -418,9 +418,9 @@ define(['require',
                 var that = this,
                     termData = "";
                 _.each(data, function(val) {
-                    if (val.relationshipStatus == "ACTIVE") {
-                        termData += '<span class="btn btn-action btn-sm btn-icon btn-blue" title=' + _.escape(val.displayText) + ' data-id="termClick"><span>' + _.escape(val.displayText) + '</span><i class="fa fa-close" data-id="deleteTerm" data-guid="' + val.guid + '" data-type="term" title="Remove Term"></i></span>';
-                    }
+                    // if (val.relationshipStatus == "ACTIVE") {
+                    termData += '<span class="btn btn-action btn-sm btn-icon btn-blue" data-id="termClick"><span title=' + _.escape(val.displayText) + '>' + _.escape(val.displayText) + '</span><i class="' + (val.relationshipStatus == "ACTIVE" ? 'fa fa-close' : "") + '" data-id="deleteTerm" data-guid="' + val.guid + '" data-type="term" title="Remove Term"></i></span>';
+                    // } 
                 });
                 this.ui.termList.find("span.btn").remove();
                 this.ui.termList.prepend(termData);

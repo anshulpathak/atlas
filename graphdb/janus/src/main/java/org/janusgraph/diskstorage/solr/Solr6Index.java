@@ -54,6 +54,7 @@ import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.utils.HttpClientUtils;
 import org.apache.http.entity.BufferedHttpEntity;
 import org.apache.http.impl.auth.KerberosScheme;
 import org.apache.http.protocol.HttpContext;
@@ -139,6 +140,7 @@ public class Solr6Index implements IndexProvider {
     private static final char   CHROOT_START_CHAR = '/';
 
     private static Solr6Index instance = null;
+    public static final ConfigOption<Boolean> CREATE_SOLR_CLIENT_PER_REQUEST = new ConfigOption(SOLR_NS, "create-client-per-request", "when false, allows the sharing of solr client across other components.", org.janusgraph.diskstorage.configuration.ConfigOption.Type.LOCAL, false);
 
     private enum Mode {
         HTTP, CLOUD;
@@ -168,6 +170,7 @@ public class Solr6Index implements IndexProvider {
             .build();
 
     private static final Map<Geo, String> SPATIAL_PREDICATES = spatialPredicates();
+    private static boolean createSolrClientPerRequest;
 
     private final SolrClient solrClient;
     private final Configuration configuration;
@@ -178,6 +181,7 @@ public class Solr6Index implements IndexProvider {
     private final int batchSize;
     private final boolean waitSearcher;
     private final boolean kerberosEnabled;
+
 
     public Solr6Index(final Configuration config) throws BackendException {
         // Add Kerberos-enabled SolrHttpClientBuilder
@@ -203,24 +207,54 @@ public class Solr6Index implements IndexProvider {
         }
 
         solrClient = createSolrClient();
-
+        createSolrClientPerRequest = config.get(CREATE_SOLR_CLIENT_PER_REQUEST);
+        if(createSolrClientPerRequest) {
+            logger.info("A new Solr Client will be created for direct interation with SOLR.");
+        } else {
+            logger.info("Solr Client will be shared for direct interation with SOLR.");
+        }
         Solr6Index.instance = this;
     }
 
     public static SolrClient getSolrClient() {
-        return Solr6Index.instance != null ? Solr6Index.instance.createSolrClient() : null;
+        if (Solr6Index.instance != null) {
+            if (createSolrClientPerRequest) {
+                logger.debug("Creating a new Solr Client.");
+                return Solr6Index.instance.createSolrClient();
+            } else {
+                logger.debug("Returning the solr client owned by Solr6Index.");
+                return Solr6Index.instance.solrClient;
+            }
+        } else {
+            logger.debug(" No Solr6Index available. Will return null");
+            return null;
+        }
     }
 
     public static void releaseSolrClient(SolrClient solrClient) {
-        if (solrClient != null) {
-            try {
-                solrClient.close();
-            } catch (IOException excp) {
-                logger.warn("Failed to close SolrClient", excp);
+        if(createSolrClientPerRequest) {
+            if (solrClient != null) {
+                try {
+                    solrClient.close();
+
+                    if(logger.isDebugEnabled()) {
+                        logger.debug("Closed the solr client successfully.");
+                    }
+                } catch (IOException excp) {
+                    logger.warn("Failed to close SolrClient.", excp);
+                }
+            }
+        } else {
+            if(logger.isDebugEnabled()) {
+                logger.debug("Ignoring the closing of solr client as it is owned by Solr6Index.");
             }
         }
     }
+
     private SolrClient createSolrClient() {
+        if(logger.isDebugEnabled()) {
+            logger.debug("HttpClientBuilder = {}", HttpClientUtil.getHttpClientBuilder(), new Exception());
+        }
         final ModifiableSolrParams clientParams = new ModifiableSolrParams();
         SolrClient solrClient = null;
 
@@ -336,6 +370,11 @@ public class Solr6Index implements IndexProvider {
         String analyzer = ParameterType.STRING_ANALYZER.findParameter(information.getParameters(), null);
         if (analyzer != null) {
             //If the key have a tokenizer, we try to get it by reflection
+            // some referred classes might not be able to be found via SystemClassLoader
+            // since they might be associated with other classloader, in this situation
+            // ClassNotFound exception will be thrown. instead of using SystemClassLoader
+            // for all classes, we find its classloader first and then load the class, please
+            // call - instantiateUsingClassLoader()
             try {
                 ((Constructor<Tokenizer>) ClassLoader.getSystemClassLoader().loadClass(analyzer)
                         .getConstructor()).newInstance();
@@ -352,6 +391,17 @@ public class Solr6Index implements IndexProvider {
             } catch (final ReflectiveOperationException e) {
                 throw new PermanentBackendException(e.getMessage(),e);
             }
+        }
+    }
+
+    private void instantiateUsingClassLoader(String analyzer) throws PermanentBackendException {
+        if (analyzer == null) return;
+        try {
+            Class analyzerClass = Class.forName(analyzer);
+            ClassLoader cl = analyzerClass.getClassLoader();
+            ((Constructor<Tokenizer>) cl.loadClass(analyzer).getConstructor()).newInstance();
+        } catch (final ReflectiveOperationException e) {
+            throw new PermanentBackendException(e.getMessage(),e);
         }
     }
 
@@ -575,12 +625,7 @@ public class Solr6Index implements IndexProvider {
         final String queryFilter = buildQueryFilter(query.getCondition(), information.get(collection));
         solrQuery.addFilterQuery(queryFilter);
         if (!query.getOrder().isEmpty()) {
-            final List<IndexQuery.OrderEntry> orders = query.getOrder();
-            for (final IndexQuery.OrderEntry order1 : orders) {
-                final String item = order1.getKey();
-                final SolrQuery.ORDER order = order1.getOrder() == Order.ASC ? SolrQuery.ORDER.asc : SolrQuery.ORDER.desc;
-                solrQuery.addSort(new SolrQuery.SortClause(item, order));
-            }
+            addOrderToQuery(solrQuery, query.getOrder());
         }
         solrQuery.setStart(0);
         if (query.hasLimit()) {
@@ -590,6 +635,14 @@ public class Solr6Index implements IndexProvider {
         }
         return executeQuery(query.hasLimit() ? query.getLimit() : null, 0, collection, solrQuery,
                 doc -> doc.getFieldValue(keyIdField).toString());
+    }
+
+    private void addOrderToQuery(SolrQuery solrQuery, List<IndexQuery.OrderEntry> orders) {
+        for (final IndexQuery.OrderEntry order1 : orders) {
+            final String item = order1.getKey();
+            final SolrQuery.ORDER order = order1.getOrder() == Order.ASC ? SolrQuery.ORDER.asc : SolrQuery.ORDER.desc;
+            solrQuery.addSort(new SolrQuery.SortClause(item, order));
+        }
     }
 
     private <E> Stream<E> executeQuery(Integer limit, int offset, String collection, SolrQuery solrQuery,
@@ -619,6 +672,9 @@ public class Solr6Index implements IndexProvider {
             solrQuery.setRows(Math.min(query.getLimit(), batchSize));
         } else {
             solrQuery.setRows(batchSize);
+        }
+        if (!query.getOrders().isEmpty()) {
+            addOrderToQuery(solrQuery, query.getOrders());
         }
 
         for(final Parameter parameter: query.getParameters()) {

@@ -161,7 +161,7 @@ public abstract class BaseImpalaEvent {
                 return context.getQualifiedNameForTable(node.getVertexId());
 
             case COLUMN:
-                return context.getQualifiedNameForColumn(node.getVertexId());
+                return context.getQualifiedNameForColumn(node);
 
             default:
                 LOG.warn("null qualified name for type: {} and name: {}", nodeType, node.getVertexId());
@@ -340,7 +340,7 @@ public abstract class BaseImpalaEvent {
 
             ret.setAttribute(ATTRIBUTE_QUALIFIED_NAME, dbQualifiedName);
             ret.setAttribute(ATTRIBUTE_NAME, dbName.toLowerCase());
-            ret.setAttribute(ATTRIBUTE_CLUSTER_NAME, context.getClusterName());
+            ret.setAttribute(ATTRIBUTE_CLUSTER_NAME, context.getMetadataNamespace());
 
             context.putEntity(dbQualifiedName, ret);
         }

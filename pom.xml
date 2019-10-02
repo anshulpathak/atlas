@@ -609,7 +609,7 @@
                 <graphdb.backend.impl>org.apache.atlas.repository.graphdb.janus.AtlasJanusGraphDatabase</graphdb.backend.impl>
                 <graph.index.backend>solr</graph.index.backend>
                 <tests.solr.embedded>true</tests.solr.embedded>
-                <distro.exclude.packages>WEB-INF/lib/je-*.jar,WEB-INF/lib/solr-test-framework-*.jar, WEB-INF/lib/jts-*.jar,WEB-INF/lib/logback-*.jar</distro.exclude.packages>
+                <distro.exclude.packages>WEB-INF/lib/je-*.jar,WEB-INF/lib/solr-test-framework-*.jar, WEB-INF/lib/jts-*.jar,WEB-INF/lib/logback-*.jar,WEB-INF/lib/dom4j-*.jar</distro.exclude.packages>
             </properties>
         </profile>
 
@@ -629,7 +629,7 @@
                 <graphdb.backend.impl>org.apache.atlas.repository.graphdb.janus.AtlasJanusGraphDatabase</graphdb.backend.impl>
                 <graph.index.backend>solr</graph.index.backend>
                 <tests.solr.embedded>true</tests.solr.embedded>
-                <distro.exclude.packages>WEB-INF/lib/je-*.jar,WEB-INF/lib/solr-test-framework-*.jar, WEB-INF/lib/jts-*.jar,WEB-INF/lib/logback-*.jar</distro.exclude.packages>
+                <distro.exclude.packages>WEB-INF/lib/je-*.jar,WEB-INF/lib/solr-test-framework-*.jar, WEB-INF/lib/jts-*.jar,WEB-INF/lib/logback-*.jar,WEB-INF/lib/dom4j-*.jar</distro.exclude.packages>
             </properties>
         </profile>
 
@@ -637,6 +637,7 @@
             <id>skipMinify</id>
             <properties>
                 <project.build.dashboardv2.gruntBuild>build</project.build.dashboardv2.gruntBuild>
+                <project.build.dashboardv3.gruntBuild>build</project.build.dashboardv3.gruntBuild>
             </properties>
         </profile>
 
@@ -656,7 +657,10 @@
         <jersey.version>1.19</jersey.version>
         <jsr.version>1.1</jsr.version>
 
-        <janus.version>0.3.1</janus.version>
+        <janus.version>0.4.0</janus.version>
+        <tinkerpop.version>3.4.1</tinkerpop.version>
+        <lucene-solr.version>7.3.0</lucene-solr.version>
+
         <hadoop.version>3.1.1</hadoop.version>
         <hbase.version>2.0.2</hbase.version>
         <solr.version>7.5.0</solr.version>
@@ -678,8 +682,8 @@
         <gson.version>2.5</gson.version>
         <fastutil.version>6.5.16</fastutil.version>
         <guice.version>4.1.0</guice.version>
-        <spring.version>4.3.18.RELEASE</spring.version>
-        <spring.security.version>4.2.7.RELEASE</spring.security.version>
+        <spring.version>4.3.20.RELEASE</spring.version>
+        <spring.security.version>4.2.13.RELEASE</spring.security.version>
 
         <javax.servlet.version>3.1.0</javax.servlet.version>
         <guava.version>25.1-jre</guava.version>
@@ -688,6 +692,7 @@
         <!-- Needed for hooks -->
         <aopalliance.version>1.0</aopalliance.version>
         <jackson.version>2.9.9</jackson.version>
+        <jackson.databind.version>2.9.9.1</jackson.databind.version>
 
         <!-- Apache commons -->
         <commons-conf.version>1.10</commons-conf.version>
@@ -719,6 +724,10 @@
         <hppc.version>0.8.1</hppc.version>
         <!-- Storm dependencies -->
 
+        <!-- keycloak dependencies -->
+        <keycloak.version>6.0.1</keycloak.version>
+        <!-- keycloak dependencies -->
+
         <PermGen>64m</PermGen>
         <MaxPermGen>512m</MaxPermGen>
 
@@ -748,6 +757,7 @@
 
         <aspectj.runtime.version>1.8.7</aspectj.runtime.version>
         <project.build.dashboardv2.gruntBuild>build-minify</project.build.dashboardv2.gruntBuild>
+        <project.build.dashboardv3.gruntBuild>build-minify</project.build.dashboardv3.gruntBuild>
         <testng.version>6.9.4</testng.version>
         <joda-time.version>2.10</joda-time.version>
         <jersey-spring.version>1.19.4</jersey-spring.version>
@@ -766,6 +776,7 @@
         <module>repository</module>
         <module>authorization</module>
         <module>dashboardv2</module>
+        <module>dashboardv3</module>
         <module>webapp</module>
         <module>docs</module>
 
@@ -1431,6 +1442,13 @@
 
             <dependency>
                 <groupId>org.apache.atlas</groupId>
+                <artifactId>atlas-dashboardv3</artifactId>
+                <version>${project.version}</version>
+                <type>war</type>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.atlas</groupId>
                 <artifactId>atlas-webapp</artifactId>
                 <version>${project.version}</version>
                 <type>war</type>
@@ -2073,6 +2091,11 @@
                         <exclude>**/*rebel*.xml</exclude>
                         <exclude>**/*rebel*.xml.bak</exclude>
                         <exclude>**/test/resources/**</exclude>
+
+                        <!-- atlas doc directory -->
+                        <exclude>**/docz-lib/**</exclude>
+                        <exclude>**/.docz/**</exclude>
+                        
                     </excludes>
                 </configuration>
                 <executions>

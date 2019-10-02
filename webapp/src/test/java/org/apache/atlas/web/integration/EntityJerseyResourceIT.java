@@ -46,6 +46,8 @@ import org.testng.annotations.Test;
 
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static com.sun.jersey.api.client.ClientResponse.Status.BAD_REQUEST;
@@ -277,9 +279,10 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
     public void testGetEntityByAttribute() throws Exception {
         Referenceable db1 = new Referenceable(DATABASE_TYPE_BUILTIN);
         String dbName = randomString();
+        String qualifiedName = dbName + "@cl1";
         db1.set(NAME, dbName);
         db1.set(DESCRIPTION, randomString());
-        db1.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, dbName);
+        db1.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, qualifiedName);
         db1.set("owner", "user1");
         db1.set(CLUSTER_NAME, "cl1");
         db1.set("parameters", Collections.EMPTY_MAP);
@@ -287,9 +290,9 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
         createInstance(db1);
 
         //get entity by attribute
-        Referenceable referenceable = atlasClientV1.getEntity(DATABASE_TYPE_BUILTIN, QUALIFIED_NAME, dbName);
+        Referenceable referenceable = atlasClientV1.getEntity(DATABASE_TYPE_BUILTIN, QUALIFIED_NAME, qualifiedName);
         Assert.assertEquals(referenceable.getTypeName(), DATABASE_TYPE_BUILTIN);
-        Assert.assertEquals(referenceable.get(QUALIFIED_NAME), dbName);
+        Assert.assertEquals(referenceable.get(QUALIFIED_NAME), dbName + "@" + "cl1");
     }
 
     @Test
@@ -817,28 +820,36 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
         return RandomStringUtils.random(10);
     }
 
+    private String randomUTF8() throws Exception {
+        String ret = random();
+
+        if (!StandardCharsets.UTF_8.equals(Charset.defaultCharset())) {
+            ret = new String(ret.getBytes(), StandardCharsets.UTF_8.name());
+        }
+
+        return ret;
+    }
+
     @Test
     public void testUTF8() throws Exception {
-        //Type names cannot be arbitrary UTF8 characters. See org.apache.atlas.type.AtlasTypeUtil#validateType()
-        String classType = randomString();
-        String attrName = random();
-        String attrValue = random();
+        String              attrName            = randomUTF8();
+        String              attrValue           = randomUTF8();
+        String              classType           = randomString(); //Type names cannot be arbitrary UTF8 characters. See org.apache.atlas.type.AtlasTypeUtil#validateType()
+        ClassTypeDefinition classTypeDefinition = TypesUtil.createClassTypeDef(classType, null, Collections.<String>emptySet(), TypesUtil.createUniqueRequiredAttrDef(attrName, AtlasBaseTypeDef.ATLAS_TYPE_STRING));
+        TypesDef            typesDef            = new TypesDef(Collections.<EnumTypeDefinition>emptyList(), Collections.<StructTypeDefinition>emptyList(), Collections.<TraitTypeDefinition>emptyList(), Collections.singletonList(classTypeDefinition));
 
-        ClassTypeDefinition classTypeDefinition = TypesUtil
-                .createClassTypeDef(classType, null, Collections.<String>emptySet(),
-                        TypesUtil.createUniqueRequiredAttrDef(attrName, AtlasBaseTypeDef.ATLAS_TYPE_STRING));
-        TypesDef typesDef = new TypesDef(Collections.<EnumTypeDefinition>emptyList(), Collections.<StructTypeDefinition>emptyList(),
-                Collections.<TraitTypeDefinition>emptyList(),
-                Collections.singletonList(classTypeDefinition));
         createType(typesDef);
 
-        Referenceable instance = new Referenceable(classType);
-        instance.set(attrName, attrValue);
-        Id guid = createInstance(instance);
+        Referenceable entityToCreate  = new Referenceable(classType, Collections.singletonMap(attrName, attrValue));
+        Id            guid            = createInstance(entityToCreate);
+        ObjectNode    response        = atlasClientV1.callAPIWithBodyAndParams(AtlasClient.API_V1.GET_ENTITY, null, guid._getId());
+        Object        objResponse     = response.get(AtlasClient.DEFINITION);
+        String        jsonResponse    = AtlasType.toJson(objResponse);
+        Referenceable createdEntity   = AtlasType.fromV1Json(jsonResponse, Referenceable.class);
+        Object        entityAttrValue = createdEntity.get(attrName);
 
-        ObjectNode response = atlasClientV1.callAPIWithBodyAndParams(AtlasClient.API_V1.GET_ENTITY, null, guid._getId());
-        Referenceable getReferenceable = AtlasType.fromV1Json(AtlasType.toJson(response.get(AtlasClient.DEFINITION)), Referenceable.class);
-        Assert.assertEquals(getReferenceable.get(attrName), attrValue);
+        Assert.assertEquals(entityAttrValue, attrValue,
+                            "attrName=" + attrName + "; attrValue=" + attrValue + "; entityToCreate=" + entityToCreate + "; entityId=" + guid + "; getEntityResponse_Obj=" + objResponse + "; getEntityResponse_Json=" + jsonResponse + "; getEntityResponse_Entity=" + createdEntity);
     }
 
 
@@ -1096,11 +1107,12 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
         // Create database entity
         Referenceable db1 = new Referenceable(DATABASE_TYPE_BUILTIN);
         String dbName = randomString();
+        String qualifiedName = dbName + "@cl1";
         db1.set(NAME, dbName);
-        db1.set(QUALIFIED_NAME, dbName);
+        db1.set(QUALIFIED_NAME, qualifiedName);
         db1.set(CLUSTER_NAME, randomString());
         db1.set(DESCRIPTION, randomString());
-        db1.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, dbName);
+        db1.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, qualifiedName);
         db1.set("owner", "user1");
         db1.set(CLUSTER_NAME, "cl1");
         db1.set("parameters", Collections.EMPTY_MAP);
@@ -1108,7 +1120,7 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
         Id db1Id = createInstance(db1);
 
         // Delete the database entity
-        List<String> deletedGuidsList = atlasClientV1.deleteEntity(DATABASE_TYPE_BUILTIN, QUALIFIED_NAME, dbName).getDeletedEntities();
+        List<String> deletedGuidsList = atlasClientV1.deleteEntity(DATABASE_TYPE_BUILTIN, QUALIFIED_NAME, qualifiedName).getDeletedEntities();
 
         // Verify that deleteEntities() response has database entity guids
         Assert.assertEquals(deletedGuidsList.size(), 1);

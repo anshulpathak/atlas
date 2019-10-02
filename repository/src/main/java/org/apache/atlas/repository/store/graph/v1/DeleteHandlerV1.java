@@ -62,8 +62,10 @@ import static org.apache.atlas.model.typedef.AtlasRelationshipDef.PropagateTags.
 import static org.apache.atlas.repository.Constants.CLASSIFICATION_EDGE_NAME_PROPERTY_KEY;
 import static org.apache.atlas.repository.Constants.CLASSIFICATION_ENTITY_STATUS;
 import static org.apache.atlas.repository.Constants.CLASSIFICATION_LABEL;
+import static org.apache.atlas.repository.Constants.CLASSIFICATION_NAME_DELIMITER;
 import static org.apache.atlas.repository.Constants.MODIFICATION_TIMESTAMP_PROPERTY_KEY;
 import static org.apache.atlas.repository.Constants.MODIFIED_BY_KEY;
+import static org.apache.atlas.repository.Constants.PROPAGATED_CLASSIFICATION_NAMES_KEY;
 import static org.apache.atlas.repository.Constants.PROPAGATED_TRAIT_NAMES_PROPERTY_KEY;
 import static org.apache.atlas.repository.Constants.RELATIONSHIP_GUID_PROPERTY_KEY;
 import static org.apache.atlas.repository.graph.GraphHelper.*;
@@ -449,7 +451,7 @@ public abstract class DeleteHandlerV1 {
 
                 graphHelper.addClassificationEdge(propagatedEntityVertex, classificationVertex, true);
 
-                addToPropagatedTraitNames(propagatedEntityVertex, classificationName);
+                addToPropagatedClassificationNames(propagatedEntityVertex, classificationName);
 
                 // record add propagation details to send notifications at the end
                 RequestContext      context        = RequestContext.get();
@@ -613,7 +615,7 @@ public abstract class DeleteHandlerV1 {
 
                         graphHelper.removeEdge(propagatedEdge);
 
-                        removeFromPropagatedTraitNames(impactedEntityVertex, classificationName);
+                        removeFromPropagatedClassificationNames(impactedEntityVertex, classificationName);
                     } else {
                         if (LOG.isDebugEnabled()) {
                             LOG.debug(" --> Not removing propagated classification edge from [{}] --> [{}][{}] using edge label: [{}], since edge doesn't exist",
@@ -665,7 +667,7 @@ public abstract class DeleteHandlerV1 {
                        getTypeName(entityVertex), GraphHelper.getGuid(entityVertex), CLASSIFICATION_LABEL);
         }
 
-        removeFromPropagatedTraitNames(entityVertex, classificationName);
+        removeFromPropagatedClassificationNames(entityVertex, classificationName);
 
         deleteEdge(edge, true);
 
@@ -986,17 +988,47 @@ public abstract class DeleteHandlerV1 {
         return Objects.nonNull(entityType) && entityType.isInternalType();
     }
 
-    private void removeFromPropagatedTraitNames(AtlasVertex entityVertex, String classificationName) {
+    private void addToPropagatedClassificationNames(AtlasVertex entityVertex, String classificationName) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Adding property {} = \"{}\" to vertex {}", PROPAGATED_TRAIT_NAMES_PROPERTY_KEY, classificationName, string(entityVertex));
+        }
+        entityVertex.addListProperty(PROPAGATED_TRAIT_NAMES_PROPERTY_KEY, classificationName);
+
+        String propClsNames = entityVertex.getProperty(PROPAGATED_CLASSIFICATION_NAMES_KEY, String.class);
+
+        propClsNames = StringUtils.isEmpty(propClsNames) ? CLASSIFICATION_NAME_DELIMITER + classificationName
+                                                         : (propClsNames + classificationName);
+
+        propClsNames = propClsNames + CLASSIFICATION_NAME_DELIMITER;
+        entityVertex.setProperty(PROPAGATED_CLASSIFICATION_NAMES_KEY, propClsNames);
+    }
+
+    private void removeFromPropagatedClassificationNames(AtlasVertex entityVertex, String classificationName) {
         if (entityVertex != null && StringUtils.isNotEmpty(classificationName)) {
             List<String> propagatedTraitNames = getTraitNames(entityVertex, true);
 
             propagatedTraitNames.remove(classificationName);
 
-            entityVertex.removeProperty(PROPAGATED_TRAIT_NAMES_PROPERTY_KEY);
+            setPropagatedClassificationNames(entityVertex, propagatedTraitNames);
+        }
+    }
 
-            for (String propagatedTraitName : propagatedTraitNames) {
-                addToPropagatedTraitNames(entityVertex, propagatedTraitName);
+    private void setPropagatedClassificationNames(AtlasVertex entityVertex, List<String> classificationNames) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Adding property {} = \"{}\" to vertex {}", PROPAGATED_TRAIT_NAMES_PROPERTY_KEY, classificationNames, string(entityVertex));
+        }
+
+        entityVertex.removeProperty(PROPAGATED_TRAIT_NAMES_PROPERTY_KEY);
+        entityVertex.removeProperty(PROPAGATED_CLASSIFICATION_NAMES_KEY);
+
+        if (CollectionUtils.isNotEmpty(classificationNames)) {
+            for (String classificationName : classificationNames) {
+                entityVertex.addListProperty(PROPAGATED_TRAIT_NAMES_PROPERTY_KEY, classificationName);
             }
+
+            String propClsName = CLASSIFICATION_NAME_DELIMITER + StringUtils.join(classificationNames, CLASSIFICATION_NAME_DELIMITER) + CLASSIFICATION_NAME_DELIMITER;
+
+            entityVertex.setProperty(PROPAGATED_CLASSIFICATION_NAMES_KEY, propClsName);
         }
     }
 

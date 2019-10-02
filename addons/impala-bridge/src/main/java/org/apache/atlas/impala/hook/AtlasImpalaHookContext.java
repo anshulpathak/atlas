@@ -23,16 +23,19 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.atlas.impala.model.ImpalaOperationType;
 import org.apache.atlas.impala.model.ImpalaQuery;
+import org.apache.atlas.impala.model.LineageVertex;
+import org.apache.atlas.impala.model.LineageVertexMetadata;
 import org.apache.atlas.model.instance.AtlasEntity;
+import org.apache.commons.lang.StringUtils;
 
 
 /**
  * Contain the info related to an linear record from Impala
  */
 public class AtlasImpalaHookContext {
-    public static final char   QNAME_SEP_CLUSTER_NAME = '@';
-    public static final char   QNAME_SEP_ENTITY_NAME  = '.';
-    public static final char   QNAME_SEP_PROCESS      = ':';
+    public static final char QNAME_SEP_METADATA_NAMESPACE = '@';
+    public static final char QNAME_SEP_ENTITY_NAME        = '.';
+    public static final char QNAME_SEP_PROCESS            = ':';
 
     private final ImpalaLineageHook        hook;
     private final ImpalaOperationType      impalaOperation;
@@ -66,8 +69,8 @@ public class AtlasImpalaHookContext {
 
     public Collection<AtlasEntity> getEntities() { return qNameEntityMap.values(); }
 
-    public String getClusterName() {
-        return hook.getClusterName();
+    public String getMetadataNamespace() {
+        return hook.getMetadataNamespace();
     }
 
     public String getHostName() {
@@ -79,7 +82,7 @@ public class AtlasImpalaHookContext {
     }
 
     public String getQualifiedNameForDb(String dbName) {
-        return (dbName + QNAME_SEP_CLUSTER_NAME).toLowerCase() + getClusterName();
+        return (dbName + QNAME_SEP_METADATA_NAMESPACE).toLowerCase() + getMetadataNamespace();
     }
 
     public String getQualifiedNameForTable(String fullTableName) throws IllegalArgumentException {
@@ -97,8 +100,44 @@ public class AtlasImpalaHookContext {
     }
 
     public String getQualifiedNameForTable(String dbName, String tableName) {
-        return (dbName + QNAME_SEP_ENTITY_NAME + tableName + QNAME_SEP_CLUSTER_NAME).toLowerCase() +
-            getClusterName();
+        return (dbName + QNAME_SEP_ENTITY_NAME + tableName + QNAME_SEP_METADATA_NAMESPACE).toLowerCase() + getMetadataNamespace();
+    }
+
+    public String getQualifiedNameForColumn(LineageVertex vertex) {
+        // get database name and table name
+        LineageVertexMetadata metadata = vertex.getMetadata();
+
+        if (metadata == null) {
+            return getQualifiedNameForColumn(vertex.getVertexId());
+        }
+
+        String fullTableName = metadata.getTableName();
+
+        if (StringUtils.isEmpty(fullTableName)) {
+            throw new IllegalArgumentException("fullTableName in column metadata is null");
+        }
+
+        int sepPos = fullTableName.lastIndexOf(QNAME_SEP_ENTITY_NAME);
+
+        if (!isSeparatorIndexValid(sepPos)) {
+            throw new IllegalArgumentException(fullTableName + "in column metadata does not contain database name");
+        }
+
+        // get pure column name
+        String columnName = vertex.getVertexId();
+        if (StringUtils.isEmpty(columnName)) {
+            throw new IllegalArgumentException("column name in vertexId is null");
+        }
+
+        int sepPosLast = columnName.lastIndexOf(QNAME_SEP_ENTITY_NAME);
+        if (isSeparatorIndexValid(sepPosLast)) {
+            columnName = columnName.substring(sepPosLast+1);
+        }
+
+        return getQualifiedNameForColumn(
+            fullTableName.substring(0, sepPos),
+            fullTableName.substring(sepPos+1),
+            columnName);
     }
 
     public String getQualifiedNameForColumn(String fullColumnName) throws IllegalArgumentException {
@@ -139,7 +178,7 @@ public class AtlasImpalaHookContext {
     public String getQualifiedNameForColumn(String dbName, String tableName, String columnName) {
         return
             (dbName + QNAME_SEP_ENTITY_NAME  + tableName + QNAME_SEP_ENTITY_NAME +
-             columnName + QNAME_SEP_CLUSTER_NAME).toLowerCase() + getClusterName();
+             columnName + QNAME_SEP_METADATA_NAMESPACE).toLowerCase() + getMetadataNamespace();
     }
 
     public String getUserName() { return lineageQuery.getUser(); }

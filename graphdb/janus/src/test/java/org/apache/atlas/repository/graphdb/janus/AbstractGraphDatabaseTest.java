@@ -33,10 +33,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-
-/**
- *
- */
 public abstract class AbstractGraphDatabaseTest {
 
     protected static final String WEIGHT_PROPERTY = "weight";
@@ -99,7 +95,7 @@ public abstract class AbstractGraphDatabaseTest {
         AtlasPropertyKey key = management.makePropertyKey(propertyName, propertyClass, cardinality);
         try {
             if (propertyClass != Integer.class) {
-                management.addMixedIndex(BACKING_INDEX_NAME, key);
+                management.addMixedIndex(BACKING_INDEX_NAME, key, false);
             }
         } catch(Throwable t) {
             //ok
@@ -112,12 +108,7 @@ public abstract class AbstractGraphDatabaseTest {
             //ok
             t.printStackTrace();
         }
-
-
     }
-
-
-
 
     protected final <V, E> AtlasGraph<V, E> getGraph() {
         if (graph == null) {
@@ -184,5 +175,4 @@ public abstract class AbstractGraphDatabaseTest {
             return exceptionThrown;
         }
     }
-
 }

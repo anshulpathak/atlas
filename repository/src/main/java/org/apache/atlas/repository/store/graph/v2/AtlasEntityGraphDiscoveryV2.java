@@ -36,6 +36,7 @@ import org.apache.atlas.type.AtlasStructType.AtlasAttribute;
 import org.apache.atlas.type.AtlasType;
 import org.apache.atlas.type.AtlasTypeRegistry;
 import org.apache.atlas.type.AtlasTypeUtil;
+import org.apache.atlas.type.TemplateToken;
 import org.apache.atlas.utils.AtlasEntityUtil;
 import org.apache.atlas.utils.AtlasPerfMetrics.MetricRecorder;
 import org.slf4j.Logger;
@@ -55,10 +56,12 @@ public class AtlasEntityGraphDiscoveryV2 implements EntityGraphDiscovery {
 
     private final AtlasTypeRegistry           typeRegistry;
     private final EntityGraphDiscoveryContext discoveryContext;
+    private final EntityGraphMapper           entityGraphMapper;
 
-    public AtlasEntityGraphDiscoveryV2(AtlasTypeRegistry typeRegistry, EntityStream entityStream) {
-        this.typeRegistry     = typeRegistry;
-        this.discoveryContext = new EntityGraphDiscoveryContext(typeRegistry, entityStream);
+    public AtlasEntityGraphDiscoveryV2(AtlasTypeRegistry typeRegistry, EntityStream entityStream, EntityGraphMapper entityGraphMapper) {
+        this.typeRegistry      = typeRegistry;
+        this.discoveryContext  = new EntityGraphDiscoveryContext(typeRegistry, entityStream);
+        this.entityGraphMapper = entityGraphMapper;
     }
 
     @Override
@@ -144,6 +147,8 @@ public class AtlasEntityGraphDiscoveryV2 implements EntityGraphDiscovery {
                 throw new AtlasBaseException(AtlasErrorCode.INVALID_PARAMETERS, "found null entity");
             }
 
+            processDynamicAttributes(entity);
+
             walkEntityGraph(entity);
 
             walkedEntities.add(entity.getGuid());
@@ -174,8 +179,8 @@ public class AtlasEntityGraphDiscoveryV2 implements EntityGraphDiscovery {
     protected void resolveReferences() throws AtlasBaseException {
         MetricRecorder metric = RequestContext.get().startMetricRecord("resolveReferences");
 
-        EntityResolver[] entityResolvers = new EntityResolver[] { new IDBasedEntityResolver(typeRegistry),
-                                                                  new UniqAttrBasedEntityResolver(typeRegistry)
+        EntityResolver[] entityResolvers = new EntityResolver[] { new IDBasedEntityResolver(typeRegistry, entityGraphMapper),
+                                                                  new UniqAttrBasedEntityResolver(typeRegistry, entityGraphMapper)
                                                                 };
 
         for (EntityResolver resolver : entityResolvers) {
@@ -393,6 +398,43 @@ public class AtlasEntityGraphDiscoveryV2 implements EntityGraphDiscovery {
             discoveryContext.addReferencedGuid(objId.getGuid());
         } else {
             discoveryContext.addReferencedByUniqAttribs(objId);
+        }
+    }
+
+    private void processDynamicAttributes(AtlasEntity entity) throws AtlasBaseException {
+        AtlasEntityType entityType = typeRegistry.getEntityTypeByName(entity.getTypeName());
+
+        if (entityType == null) {
+            throw new AtlasBaseException(AtlasErrorCode.TYPE_NAME_INVALID, TypeCategory.ENTITY.name(), entity.getTypeName());
+        }
+
+        for (AtlasAttribute attribute : entityType.getDynEvalAttributes()) {
+            String              attributeName   = attribute.getName();
+            List<TemplateToken> tokens          = entityType.getParsedTemplates().get(attributeName);
+
+            if (tokens == null) {
+                continue;
+            }
+
+            StringBuilder dynAttributeValue = new StringBuilder();
+
+            boolean set = true;
+
+            for (TemplateToken token : tokens) {
+                String evaluated = token.eval(entity);
+                if (evaluated != null) {
+                    dynAttributeValue.append(evaluated);
+                } else {
+                    set = false;
+                    LOG.warn("Attribute {} for {} unable to be generated because of dynamic attribute token {}", attributeName, entityType, token.getValue());
+                    break;
+                }
+
+            }
+
+            if (set) {
+                entity.setAttribute(attributeName,dynAttributeValue.toString());
+            }
         }
     }
 }

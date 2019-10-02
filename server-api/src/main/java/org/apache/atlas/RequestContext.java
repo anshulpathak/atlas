@@ -29,7 +29,14 @@ import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Set;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.HashMap;
+
 
 public class RequestContext {
     private static final Logger METRICS = LoggerFactory.getLogger("METRICS");
@@ -38,26 +45,28 @@ public class RequestContext {
     private static final Set<RequestContext>         ACTIVE_REQUESTS = new HashSet<>();
     private static final boolean                     isMetricsEnabled = METRICS.isDebugEnabled();
 
-    private final long                                   requestTime         = System.currentTimeMillis();
-    private final Map<String, AtlasEntityHeader>         updatedEntities     = new HashMap<>();
-    private final Map<String, AtlasEntityHeader>         deletedEntities     = new HashMap<>();
-    private final Map<String, AtlasEntity>               entityCache         = new HashMap<>();
-    private final Map<String, AtlasEntityWithExtInfo>    entityExtInfoCache  = new HashMap<>();
-    private final Map<String, List<AtlasClassification>> addedPropagations   = new HashMap<>();
-    private final Map<String, List<AtlasClassification>> removedPropagations = new HashMap<>();
-    private final AtlasPerfMetrics                       metrics             = isMetricsEnabled ? new AtlasPerfMetrics() : null;
-    private       List<EntityGuidPair>                   entityGuidInRequest = null;
+    private final long                                   requestTime          = System.currentTimeMillis();
+    private final Map<String, AtlasEntityHeader>         updatedEntities      = new HashMap<>();
+    private final Map<String, AtlasEntityHeader>         deletedEntities      = new HashMap<>();
+    private final Map<String, AtlasEntity>               entityCache          = new HashMap<>();
+    private final Map<String, AtlasEntityWithExtInfo>    entityExtInfoCache   = new HashMap<>();
+    private final Map<String, List<AtlasClassification>> addedPropagations    = new HashMap<>();
+    private final Map<String, List<AtlasClassification>> removedPropagations  = new HashMap<>();
+    private final AtlasPerfMetrics                       metrics              = isMetricsEnabled ? new AtlasPerfMetrics() : null;
+    private       List<EntityGuidPair>                   entityGuidInRequest  = null;
+    private final Set<String>                            entitiesToSkipUpdate = new HashSet<>();
 
-    private String      user;
-    private Set<String> userGroups;
-    private String      clientIPAddress;
-    private DeleteType  deleteType   = DeleteType.DEFAULT;
+    private String       user;
+    private Set<String>  userGroups;
+    private String       clientIPAddress;
+    private List<String> forwardedAddresses;
+    private DeleteType   deleteType   = DeleteType.DEFAULT;
     private int         maxAttempts  = 1;
     private int         attemptCount = 1;
     private boolean     isImportInProgress = false;
     private boolean     isInNotificationProcessing = false;
     private boolean     isInTypePatching           = false;
-
+    private boolean     createShellEntityForNonExistingReference = false;
 
     private RequestContext() {
     }
@@ -100,6 +109,7 @@ public class RequestContext {
         this.entityExtInfoCache.clear();
         this.addedPropagations.clear();
         this.removedPropagations.clear();
+        this.entitiesToSkipUpdate.clear();
 
         if (metrics != null && !metrics.isEmpty()) {
             METRICS.debug(metrics.toString());
@@ -182,12 +192,26 @@ public class RequestContext {
         isInTypePatching = inTypePatching;
     }
 
+    public boolean isCreateShellEntityForNonExistingReference() {
+        return createShellEntityForNonExistingReference;
+    }
+
+    public void setCreateShellEntityForNonExistingReference(boolean createShellEntityForNonExistingReference) {
+        this.createShellEntityForNonExistingReference = createShellEntityForNonExistingReference;
+    }
 
     public void recordEntityUpdate(AtlasEntityHeader entity) {
-        if (entity != null && entity.getGuid() != null) {
+        if (entity != null && entity.getGuid() != null && ! entitiesToSkipUpdate.contains(entity.getGuid())) {
             updatedEntities.put(entity.getGuid(), entity);
         }
     }
+
+    public void recordEntityToSkip(String guid) {
+        if(! StringUtils.isEmpty(guid)) {
+            entitiesToSkipUpdate.add(guid);
+        }
+    }
+
 
     public void recordEntityDelete(AtlasEntityHeader entity) {
         if (entity != null && entity.getGuid() != null) {
@@ -340,5 +364,13 @@ public class RequestContext {
         public void resetEntityGuid() {
             entity.setGuid(guid);
         }
+    }
+
+    public List<String> getForwardedAddresses() {
+        return forwardedAddresses;
+    }
+
+    public void setForwardedAddresses(List<String> forwardedAddresses) {
+        this.forwardedAddresses = forwardedAddresses;
     }
 }
